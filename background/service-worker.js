@@ -44,6 +44,7 @@ const DEFAULT_SETTINGS = {
   timeWindowEnd: 23,
   adaptiveInterval: true,            // 限流命中自动拉长间隔
   notifyComplete: true,              // 完成桌面通知
+  autoRun: true,                     // 自动驾驶：浏览器开着就按设定速率自动清空队列
   skipBlacklist: true,               // 入队前跳过黑名单
   skipAlreadyFriends: true,          // 入队前跳过已知好友
   autoAddBlockedToBlacklist: true,   // 被 Block 自动进黑名单
@@ -268,6 +269,29 @@ async function snapshotFriendsList(steamid64) {
 }
 
 // ---------- 入队（带过滤） ----------
+
+/**
+ * 把任意输入归一化成 Steam64：
+ * - 17 位 7656119… / 7656120… → 原样
+ * - 5~10 位独立数字 → Steam 好友代码，换算（+76561197960265728）
+ * - 其他 → null
+ */
+function normalizeSteamId(id) {
+  if (typeof id !== 'string') return null;
+  const s = id.trim();
+  const inRange = (n) => n >= 76561197960265728n && n <= 76561202255233023n;
+  if (/^\d{17}$/.test(s)) {
+    try { return inRange(BigInt(s)) ? s : null; } catch (e) { return null; }
+  }
+  if (/^\d{5,10}$/.test(s)) {
+    try {
+      const n = BigInt(s) + 76561197960265728n;
+      return inRange(n) ? n.toString() : null;
+    } catch (e) { return null; }
+  }
+  return null;
+}
+
 async function enqueueIds(ids, source, sourceType) {
   if (!Array.isArray(ids) || ids.length === 0) {
     return { added: 0, duplicate: 0, skippedBlacklist: 0, skippedWhitelist: 0, skippedFriend: 0, queueSize: 0 };
@@ -283,30 +307,32 @@ async function enqueueIds(ids, source, sourceType) {
   const addedItems = [];
 
   for (const id of ids) {
-    if (typeof id !== 'string' || !/^7656119\d{10}$/.test(id)) { skippedInvalid++; continue; }
-    if (settings.skipBlacklist && blacklist[id]) { skippedBlacklist++; continue; }
-    if (whitelist[id]) { skippedWhitelist++; continue; }
-    if (settings.skipAlreadyFriends && friends[id]) { skippedFriend++; continue; }
-    if (inQueue.has(id) || tried[id]) { duplicate++; continue; }
+    const norm = normalizeSteamId(id); // 兼容好友代码（5~10 位短数字）
+    if (!norm) { skippedInvalid++; continue; }
+    if (settings.skipBlacklist && blacklist[norm]) { skippedBlacklist++; continue; }
+    if (whitelist[norm]) { skippedWhitelist++; continue; }
+    if (settings.skipAlreadyFriends && friends[norm]) { skippedFriend++; continue; }
+    if (inQueue.has(norm) || tried[norm]) { duplicate++; continue; }
 
     queue.push({
-      id,
+      id: norm,
       source: source || 'unknown',
       sourceType: sourceType || 'unknown',
       group,
       addedAt: now,
       status: 'pending'
     });
-    inQueue.add(id);
+    inQueue.add(norm);
     added++;
-    addedItems.push(id);
+    addedItems.push(norm);
   }
   await setQueue(queue);
   return { added, duplicate, skippedBlacklist, skippedWhitelist, skippedFriend, skippedInvalid, queueSize: queue.length, addedItems };
 }
 
 // ---------- 主调度 ----------
-async function runBatch() {
+async function runBatch(opts) {
+  const auto = !!(opts && opts.auto); // 自动驾驶模式：错误不弹桌面通知（每分钟重试会刷屏）
   if (await isRunning()) return { skipped: 'already-running' };
   await setRunning(true);
   STATE.abortRequested = false;
@@ -319,7 +345,7 @@ async function runBatch() {
     if (!sid) {
       const msg = '未登录 Steam（缺少 sessionid cookie）。请先打开 https://steamcommunity.com 登录。';
       await broadcast({ type: 'SFP_DONE', payload: { error: msg } });
-      await safeNotify('Steam 好友收割机', msg);
+      if (!auto) await safeNotify('Steam 好友收割机', msg);
       return { error: msg };
     }
 
@@ -344,7 +370,7 @@ async function runBatch() {
     if (settings.dailyQuota > 0 && todayBefore >= settings.dailyQuota) {
       const msg = `今日已加 ${todayBefore} 人，达到日配额 ${settings.dailyQuota}，明天再来。`;
       await broadcast({ type: 'SFP_DONE', payload: { error: msg } });
-      await safeNotify('Steam 好友收割机', msg);
+      if (!auto) await safeNotify('Steam 好友收割机', msg);
       return { error: msg };
     }
     const quotaLeft = settings.dailyQuota > 0 ? (settings.dailyQuota - todayBefore) : Infinity;
@@ -493,7 +519,7 @@ async function safeNotify(title, message) {
 
 // ---------- 黑/白名单管理 ----------
 async function addToBlacklist(steamid, reason, auto = false) {
-  if (!/^7656119\d{10}$/.test(steamid)) return { error: 'invalid steamid' };
+  if (!normalizeSteamId(steamid)) return { error: 'invalid steamid' };
   const b = await getBlacklist();
   if (b[steamid]) return { ok: true, existed: true };
   b[steamid] = { reason: reason || 'manual', timestamp: Date.now(), auto };
@@ -515,7 +541,7 @@ async function removeFromBlacklist(steamid) {
   return { ok: true };
 }
 async function addToWhitelist(steamid, reason) {
-  if (!/^7656119\d{10}$/.test(steamid)) return { error: 'invalid steamid' };
+  if (!normalizeSteamId(steamid)) return { error: 'invalid steamid' };
   const w = await getWhitelist();
   if (w[steamid]) return { ok: true, existed: true };
   w[steamid] = { reason: reason || 'manual', timestamp: Date.now() };
@@ -742,6 +768,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         }
         case 'SFP_SAVE_SETTINGS': {
           await saveSettings(msg.settings || {});
+          await setupAutoRunAlarm(); // 自动驾驶开关可能变了
           sendResponse({ ok: true });
           break;
         }
@@ -778,6 +805,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 chrome.runtime.onInstalled.addListener(async () => {
   await saveSettings(await getSettings());
   await setupUpdateAlarm();
+  await setupAutoRunAlarm();
   await checkForUpdate({ silent: true, force: true });
 });
 
@@ -785,6 +813,30 @@ const UPDATE_STATE_KEY = 'sfp_update_state';
 const UPDATE_NOTIFIED_KEY = 'sfp_update_notified';
 const ALARM_NAME = 'sfp_update_check';
 const GITHUB_API_LATEST = 'https://api.github.com/repos/zlwzk/steam-friend-picker/releases/latest';
+const AUTORUN_ALARM_NAME = 'sfp_autorun';
+
+// ---------- 自动驾驶：浏览器开着就自动按设定速率清空队列 ----------
+async function setupAutoRunAlarm() {
+  const settings = await getSettings();
+  if (!settings.autoRun) {
+    chrome.alarms.clear(AUTORUN_ALARM_NAME);
+    return;
+  }
+  chrome.alarms.create(AUTORUN_ALARM_NAME, {
+    delayInMinutes: 0.5,  // 开浏览器 / 装完 30 秒后先看一眼
+    periodInMinutes: 1    // 之后每分钟检查一次（正在跑/队列空/配额满会直接返回）
+  });
+}
+
+async function maybeAutoRun() {
+  try {
+    const [settings, running, queue] = await Promise.all([getSettings(), isRunning(), getQueue()]);
+    if (!settings.autoRun || running || queue.length === 0) return { skipped: 'idle' };
+    return await runBatch({ auto: true }); // 速率沿用 间隔/自适应/时段/日配额 设置
+  } catch (e) {
+    return { error: String(e && e.message || e) };
+  }
+}
 
 // ---------- 自动更新 ----------
 function getCurrentVersion() {
@@ -934,6 +986,8 @@ async function setupUpdateAlarm() {
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === ALARM_NAME) {
     await checkForUpdate({ silent: true });
+  } else if (alarm.name === AUTORUN_ALARM_NAME) {
+    await maybeAutoRun();
   }
 });
 
@@ -953,5 +1007,6 @@ chrome.notifications.onClicked.addListener(async (notifId) => {
 // ---------- 启动时初始化 ----------
 chrome.runtime.onStartup.addListener(async () => {
   await setupUpdateAlarm();
+  await setupAutoRunAlarm();
   await checkForUpdate({ silent: true });
 });

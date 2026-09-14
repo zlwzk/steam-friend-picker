@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS_SHAPE = {
   intervalMinMs: 8000, intervalMaxMs: 15000, maxPerRun: 30,
   retryOnRateLimit: true, maxRetries: 3,
   dailyQuota: 50, enableTimeWindow: false, timeWindowStart: 9, timeWindowEnd: 23,
-  adaptiveInterval: true, notifyComplete: true,
+  adaptiveInterval: true, notifyComplete: true, autoRun: true,
   skipBlacklist: true, skipAlreadyFriends: true, autoAddBlockedToBlacklist: true,
   theme: 'dark',
   autoCheckUpdate: true, checkUpdateIntervalHours: 6, notifyUpdate: true
@@ -124,6 +124,7 @@ async function refreshStatus() {
   $('#retry-ratelimit').checked = state.settings.retryOnRateLimit !== false;
   $('#max-retries').value = state.settings.maxRetries ?? 3;
   $('#adaptive-interval').checked = state.settings.adaptiveInterval !== false;
+  $('#auto-run').checked = state.settings.autoRun !== false;
   $('#enable-time-window').checked = !!state.settings.enableTimeWindow;
   $('#time-start').value = state.settings.timeWindowStart ?? 9;
   $('#time-end').value = state.settings.timeWindowEnd ?? 23;
@@ -464,6 +465,7 @@ async function saveSettings() {
     retryOnRateLimit: $('#retry-ratelimit').checked,
     maxRetries: Math.max(0, parseInt($('#max-retries').value, 10) || 3),
     adaptiveInterval: $('#adaptive-interval').checked,
+    autoRun: $('#auto-run').checked,
     enableTimeWindow: $('#enable-time-window').checked,
     timeWindowStart: parseInt($('#time-start').value, 10) || 9,
     timeWindowEnd: parseInt($('#time-end').value, 10) || 23,
