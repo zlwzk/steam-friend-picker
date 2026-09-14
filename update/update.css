@@ -1,0 +1,108 @@
+/* update/update.css —— 浏览器内更新页（与 popup 同风格） */
+:root[data-theme="dark"], body[data-theme="dark"] {
+  --bg: #171a21; --bg-2: #1e2630; --bg-3: #26303c;
+  --fg: #dfe6ee; --fg-2: #a8b4c2; --fg-3: #6b7787;
+  --ok: #5bc97a; --warn: #e1af5a; --err: #d35f5f; --accent: #66c0f4;
+  --border: #2f3b48;
+}
+body[data-theme="light"] {
+  --bg: #f2f5f8; --bg-2: #ffffff; --bg-3: #e8edf2;
+  --fg: #26303c; --fg-2: #55606e; --fg-3: #8a95a3;
+  --ok: #2e9e51; --warn: #b8860b; --err: #c04545; --accent: #1a78c2;
+  --border: #d5dce3;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--fg);
+  font: 14px/1.6 "Segoe UI", "Microsoft YaHei", sans-serif;
+  min-height: 100vh;
+}
+.wrap { max-width: 640px; margin: 0 auto; padding: 28px 20px 40px; }
+
+.head { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+.head h1 { font-size: 20px; font-weight: 700; }
+.ver {
+  background: var(--bg-3); color: var(--fg-2);
+  font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 10px;
+}
+.ver.update-available { background: rgba(225,175,90,0.2); color: var(--warn); }
+
+.card {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 16px; margin-bottom: 14px;
+}
+.card.hidden { display: none; }
+.card-title {
+  font-size: 11px; font-weight: 700; color: var(--fg-3);
+  text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px;
+}
+
+.row-big { display: flex; gap: 12px; align-items: flex-start; }
+.row-big > span:first-child { font-size: 26px; line-height: 1.2; }
+.status-line { font-size: 16px; font-weight: 700; }
+.status-sub { font-size: 12.5px; color: var(--fg-2); margin-top: 2px; word-break: break-all; }
+
+.ver-compare { display: flex; align-items: baseline; gap: 8px; margin-top: 12px; font-size: 20px; font-weight: 800; }
+.ver-compare.hidden { display: none; }
+.ver-old { color: var(--fg-3); text-decoration: line-through; }
+.ver-new { color: var(--ok); }
+.ver-date { font-size: 12px; font-weight: 400; color: var(--fg-3); }
+
+.notes {
+  background: var(--bg-3); border-radius: 8px; padding: 10px 12px;
+  font-size: 13px; line-height: 1.65; color: var(--fg-2);
+  max-height: 260px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;
+}
+
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.dir-status { font-size: 13px; color: var(--fg-2); word-break: break-all; }
+.dir-status.ok { color: var(--ok); font-weight: 700; }
+.hint { font-size: 12px; color: var(--fg-3); margin-top: 8px; line-height: 1.6; }
+
+.steps { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.step { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--fg-3); }
+.step .dot {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--bg-3); color: var(--fg-3);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; flex-shrink: 0;
+}
+.step.active { color: var(--fg); }
+.step.active .dot { background: var(--accent); color: #fff; }
+.step.done { color: var(--ok); }
+.step.done .dot { background: var(--ok); color: #fff; }
+.step.error { color: var(--err); }
+.step.error .dot { background: var(--err); color: #fff; }
+.step-detail { color: var(--fg-3); font-size: 12px; margin-left: auto; }
+
+.bar {
+  position: relative; height: 18px; border-radius: 9px;
+  background: var(--bg-3); overflow: hidden;
+}
+.bar-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, #3fae5a, #5bc97a);
+  border-radius: 9px; transition: width 0.25s ease;
+}
+.bar-text {
+  text-align: center; font-size: 12px; font-weight: 700;
+  color: var(--fg-2); margin-top: 6px;
+}
+
+.btn {
+  background: var(--bg-3); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 7px;
+  padding: 8px 16px; font-size: 13.5px; cursor: pointer;
+  font-family: inherit;
+}
+.btn:hover:not(:disabled) { filter: brightness(1.15); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { background: #2a6e47; border-color: #3fae5a; color: #fff; font-weight: 700; }
+.btn-large { padding: 12px 28px; font-size: 15px; }
+
+.actions { display: flex; gap: 10px; margin: 18px 0; }
+
+.done-card { border-color: var(--ok); }
+.done-card .btn { margin-top: 12px; }
+
+.foot { text-align: center; font-size: 11.5px; color: var(--fg-3); margin-top: 26px; }

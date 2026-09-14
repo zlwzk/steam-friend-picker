@@ -19,6 +19,10 @@
         <span class="badge badge-info">历史 <b id="tried-count">0</b></span>
         <span class="badge badge-info" id="today-quota-badge">今日 0/50</span>
       </div>
+      <div class="batch-progress hidden" id="batch-progress" title="批量添加进度">
+        <div class="batch-progress-fill" id="batch-progress-fill"></div>
+        <span class="batch-progress-text" id="batch-progress-text">0%</span>
+      </div>
     </header>
 
     <div id="update-banner" class="update-banner hidden">
@@ -32,14 +36,14 @@
       <div class="update-banner-body hidden" id="update-banner-body">
         <div class="update-notes-label">更新内容</div>
         <div class="update-notes" id="update-release-notes">…</div>
-        <div class="update-notes-label">怎么更新（3 步）</div>
+        <div class="update-notes-label">怎么更新（2 步）</div>
         <ol class="update-steps">
-          <li>双击桌面 <code>update.bat</code>（可视化更新器，有进度条）</li>
-          <li>等它显示「✓ 更新完成」，会自动打开扩展页</li>
-          <li>在本扩展卡片上点一下「重新加载」↻ 即生效</li>
+          <li>点下方「🚀 一键更新」打开更新页（首次需选择扩展所在文件夹，之后全自动）</li>
+          <li>等下载/解压/写入进度全部走完，回到扩展页点一下「重新加载」↻ 即生效</li>
         </ol>
         <div class="update-banner-actions">
-          <button id="btn-update-open" class="btn btn-primary btn-small">打开发布页</button>
+          <button id="btn-update-now" class="btn btn-primary btn-small">🚀 一键更新</button>
+          <button id="btn-update-open" class="btn btn-mute btn-small">打开发布页</button>
           <button id="btn-update-dismiss" class="btn btn-mute btn-small">忽略</button>
         </div>
       </div>
@@ -204,6 +208,7 @@
           <label>手动检查</label>
           <span>
             <button id="btn-check-update" class="btn btn-secondary btn-small">🔄 立即检查更新</button>
+            <button id="btn-updater-open" class="btn btn-primary btn-small">🚀 一键更新</button>
             <button id="btn-open-release" class="btn btn-mute btn-small">📄 打开 release 页</button>
           </span>
         </div>

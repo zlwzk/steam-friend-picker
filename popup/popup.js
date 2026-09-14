@@ -4,15 +4,16 @@
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-const state = {
-  queue: [], tried: {}, settings: { ...DEFAULT_SETTINGS_SHAPE },
-  running: false, loggedIn: false,
-  blacklist: {}, whitelist: {}, friends: {}, dailyCounts: {}, todayCount: 0,
-  selected: new Set(),           // 队列里勾选的 steamid
-  activeTab: 'queue',
-  search: { queue: '', history: '' },
-  filter: { log: 'all', logGroup: '', queueGroup: '' }
-};
+// 与后台通信（返回 Promise；错误由调用方 catch）
+function sendMsg(msg) {
+  return new Promise((resolve) => {
+    try {
+      chrome.runtime.sendMessage(msg, (resp) => resolve(resp));
+    } catch (e) {
+      resolve(undefined);
+    }
+  });
+}
 
 const DEFAULT_SETTINGS_SHAPE = {
   intervalMinMs: 8000, intervalMaxMs: 15000, maxPerRun: 30,
@@ -22,6 +23,16 @@ const DEFAULT_SETTINGS_SHAPE = {
   skipBlacklist: true, skipAlreadyFriends: true, autoAddBlockedToBlacklist: true,
   theme: 'dark',
   autoCheckUpdate: true, checkUpdateIntervalHours: 6, notifyUpdate: true
+};
+
+const state = {
+  queue: [], tried: {}, settings: { ...DEFAULT_SETTINGS_SHAPE },
+  running: false, loggedIn: false,
+  blacklist: {}, whitelist: {}, friends: {}, dailyCounts: {}, todayCount: 0,
+  selected: new Set(),           // 队列里勾选的 steamid
+  activeTab: 'queue',
+  search: { queue: '', history: '' },
+  filter: { log: 'all', logGroup: '', queueGroup: '' }
 };
 
 // ==================== 工具 ====================
@@ -782,6 +793,12 @@ async function manualCheckUpdate() {
   }
 }
 
+// 打开浏览器内更新页（v1.2.0 起，无需桌面脚本）
+function openUpdater() {
+  chrome.tabs.create({ url: chrome.runtime.getURL('update/update.html') });
+  window.close();
+}
+
 // ==================== 监听后台进度 ====================
 chrome.runtime.onMessage.addListener((msg) => {
   if (!msg || !msg.type) return;
@@ -797,6 +814,16 @@ chrome.runtime.onMessage.addListener((msg) => {
       $('#running-status').textContent = `⚡ ${msg.payload.processed}/${msg.payload.total}${adapt} · ✓${s.success} 友${s.already} 邀${s.invited} 限${s.ratelimited} 败${s.failed}${s.blocked ? ' 屏' + s.blocked : ''}`;
       $('#running-status').className = 'badge badge-ok';
     }
+    // 顶部百分比进度条
+    const p = msg.payload || {};
+    if (p.total > 0) {
+      const pct = Math.min(100, Math.round((p.processed / p.total) * 100));
+      const bar = $('#batch-progress');
+      $('#batch-progress-fill').style.width = pct + '%';
+      $('#batch-progress-text').textContent = `${pct}%（${p.processed}/${p.total}）`;
+      bar.classList.remove('hidden');
+      bar.title = `批量添加进度：${p.processed}/${p.total}（${pct}%）`;
+    }
     if (typeof msg.payload.queueSize === 'number') {
       $('#queue-count').textContent = msg.payload.queueSize;
       if (msg.payload.queueSize === 0) { state.queue = []; renderQueue(); }
@@ -804,6 +831,7 @@ chrome.runtime.onMessage.addListener((msg) => {
   } else if (msg.type === 'SFP_DONE') {
     state.running = false;
     $('#btn-start').disabled = false; $('#btn-stop').disabled = true;
+    $('#batch-progress').classList.add('hidden');
     if (msg.payload && msg.payload.error) {
       toast(msg.payload.error, 'error', 4000);
     } else if (msg.payload) {
@@ -900,6 +928,8 @@ async function init() {
   $('#btn-check-update').onclick = manualCheckUpdate;
   $('#btn-open-release').onclick = () => sendMsg({ type: 'SFP_OPEN_RELEASE' });
   $('#btn-update-open').onclick = () => sendMsg({ type: 'SFP_OPEN_RELEASE' });
+  $('#btn-update-now').onclick = openUpdater;
+  $('#btn-updater-open').onclick = openUpdater;
   $('#btn-update-dismiss').onclick = () => { $('#update-banner').classList.add('hidden'); };
   $('#update-banner-head').onclick = () => {
     const banner = $('#update-banner');

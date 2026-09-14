@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>Steam 好友收割机 · 更新器</title>
+  <link rel="stylesheet" href="update.css">
+</head>
+<body data-theme="dark">
+  <div class="wrap">
+    <header class="head">
+      <h1>🎮 Steam 好友收割机 · 更新器</h1>
+      <span class="ver" id="cur-version">v?</span>
+    </header>
+
+    <!-- 状态卡 -->
+    <div class="card" id="status-card">
+      <div class="row-big">
+        <span id="status-icon">⏳</span>
+        <div class="col">
+          <div class="status-line" id="status-line">正在检查更新…</div>
+          <div class="status-sub" id="status-sub">查询 GitHub 最新 release</div>
+        </div>
+      </div>
+      <div class="ver-compare hidden" id="ver-compare">
+        <span class="ver-old" id="ver-old">v?</span>
+        <span class="arrow">→</span>
+        <span class="ver-new" id="ver-new">v?</span>
+        <span class="ver-date" id="ver-date"></span>
+      </div>
+    </div>
+
+    <!-- 更新说明 -->
+    <div class="card hidden" id="notes-card">
+      <div class="card-title">更新内容</div>
+      <div class="notes" id="release-notes">…</div>
+    </div>
+
+    <!-- 目标文件夹 -->
+    <div class="card" id="dir-card">
+      <div class="card-title">扩展所在文件夹（更新写入目标）</div>
+      <div class="row">
+        <span class="dir-status" id="dir-status">未选择</span>
+        <button id="btn-pick-dir" class="btn">📁 选择文件夹</button>
+      </div>
+      <div class="hint" id="dir-hint">首次使用需选择一次：选浏览器里「加载解压缩扩展」指向的那个文件夹（里面有 manifest.json）。选择会被记住，以后一键更新无需再选。</div>
+    </div>
+
+    <!-- 进度 -->
+    <div class="card hidden" id="progress-card">
+      <div class="card-title">更新进度</div>
+      <div class="steps">
+        <div class="step" id="step-dl"><span class="dot">1</span><span class="step-text">下载更新包</span><span class="step-detail" id="dl-detail"></span></div>
+        <div class="step" id="step-un"><span class="dot">2</span><span class="step-text">解压</span><span class="step-detail" id="un-detail"></span></div>
+        <div class="step" id="step-wr"><span class="dot">3</span><span class="step-text">写入文件</span><span class="step-detail" id="wr-detail"></span></div>
+      </div>
+      <div class="bar"><div class="bar-fill" id="bar-fill"></div></div>
+      <div class="bar-text" id="bar-text">0%</div>
+    </div>
+
+    <!-- 操作 -->
+    <div class="actions">
+      <button id="btn-update" class="btn btn-primary btn-large" disabled>🚀 一键更新</button>
+      <button id="btn-recheck" class="btn">🔄 重新检查</button>
+    </div>
+
+    <!-- 完成 -->
+    <div class="card done-card hidden" id="done-card">
+      <div class="row-big">
+        <span>✅</span>
+        <div class="col">
+          <div class="status-line">更新完成！v<span id="done-ver">?</span> 已写入文件夹</div>
+          <div class="status-sub">最后一步（浏览器安全机制，无法代劳）：在扩展管理页找到「Steam 好友收割机」，点一下「重新加载」↻ 即生效。</div>
+        </div>
+      </div>
+      <button id="btn-open-ext" class="btn btn-primary">打开扩展管理页</button>
+    </div>
+
+    <footer class="foot">数据来源 github.com/zlwzk/steam-friend-picker · 全程本地写入，不上传任何数据</footer>
+  </div>
+  <script src="update.js"></script>
+</body>
+</html>
