@@ -732,9 +732,17 @@ function renderUpdateBanner(s) {
   if (s.hasUpdate) {
     const date = fmtDate(s.publishedAt);
     $('#update-banner-detail').textContent = `v${s.latestVersion} · ${date || '已发布'} · 当前 v${s.currentVersion}`;
+    // 更新说明（SW 抓 release 时存的前 600 字）
+    const notesEl = $('#update-release-notes');
+    const notes = (s.releaseNotes || '').trim();
+    notesEl.textContent = notes
+      ? notes.split('\n').filter(l => l.trim() && !/^---+$/.test(l.trim())).slice(0, 12).join('\n')
+      : '（发布页有完整说明）';
     banner.classList.remove('hidden');
   } else {
     banner.classList.add('hidden');
+    banner.classList.remove('open');
+    $('#update-banner-body').classList.add('hidden');
   }
 
   // 设置页 hint
@@ -887,6 +895,12 @@ async function init() {
   $('#btn-open-release').onclick = () => sendMsg({ type: 'SFP_OPEN_RELEASE' });
   $('#btn-update-open').onclick = () => sendMsg({ type: 'SFP_OPEN_RELEASE' });
   $('#btn-update-dismiss').onclick = () => { $('#update-banner').classList.add('hidden'); };
+  $('#update-banner-head').onclick = () => {
+    const banner = $('#update-banner');
+    const body = $('#update-banner-body');
+    body.classList.toggle('hidden');
+    banner.classList.toggle('open', !body.classList.contains('hidden'));
+  };
   $('#version-badge').onclick = manualCheckUpdate;
 
   // 重绘图表（主题切换 / 窗口大小变化时）

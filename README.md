@@ -1,4 +1,4 @@
-# 🎮 Steam 好友收割机 (Steam Friend Picker) v1.0.0
+# 🎮 Steam 好友收割机 (Steam Friend Picker) v1.1.0
 
 Edge / Chrome 浏览器扩展（Manifest V3）。**多入口**抓取 Steam 好友代码 → 智能去重过滤 → **可配置间隔批量加好友**，自带风控保护（自适应间隔、日配额、时段、限流重试）和完整本地数据管理（黑/白名单、好友对照、JSON 备份），**内置自动检查更新**。
 
@@ -76,25 +76,33 @@ Edge / Chrome 浏览器扩展（Manifest V3）。**多入口**抓取 Steam 好�
 
 - **后台定时检查**：默认每 6 小时拉一次 `api.github.com/repos/zlwzk/steam-friend-picker/releases/latest`（可改成 1~168 小时，可关）
 - **桌面通知**：发现新版本弹 `chrome.notifications`，点通知直接打开 release 页
-- **Popup 横幅**：顶部橙色横条显示 `v0.2.0 → v1.0.1 · 发布日期`，两个按钮「打开更新页」「忽略」
+- **Popup 可展开更新面板（v1.1.0）**：顶部橙色横条点击展开 → 显示新版本号、发布日期、**更新内容摘要**（来自 release body）+ 三步更新指引
 - **版本徽章高亮**：顶栏的版本号发现新版本时变橙色 + 闪烁
 - **手动检查**：设置页「立即检查更新」按钮 + 顶栏版本号点击触发
 - **节流**：30 分钟内重复点击不会重复打 API
 
-#### 🅱 桌面端（一键全自动）
+#### 🅱 桌面端（可视化更新器，v1.1.0 升级）
 
 桌面根目录放两个工具，双击即用：
 
 | 文件 | 用法 |
 |---|---|
-| `update.bat` | 双击 → 自动拉新版 → 覆盖桌面副本 → 引导到 Edge 扩展页 Reload |
-| `_auto_update.py` | Python 源码，可手动 `python _auto_update.py` 调用 |
+| `update.bat` | 双击 → 弹出**可视化更新器**（无黑框）→ 点「🚀 一键更新」→ 完成后自动打开扩展页 |
+| `_auto_update.py` | Python 源码；`--cli` 命令行模式，`--force` 强制重装修复损坏 |
 
-桌面脚本做的事：
+可视化更新器（tkinter 深色 GUI）：
+- **版本对比卡片**：当前版本 → 最新版本，大字高亮
+- **四步进度**：检查更新 → 下载（实时百分比 + 速度）→ 解压覆盖 → 完成刷新，逐步打勾
+- **彩色日志区**：带时间戳，成功绿 / 警告橙 / 错误红
+- **🔧 强制重装**：桌面副本文件损坏时，无视版本比对直接从最新 release 重装
+- **原子替换**：旧目录先改名 `.old`，失败自动回滚，不会把副本搞坏
+- 下载源优先 release asset（白名单打包），失败自动退回 codeload zipball
+
+技术说明（v1.0.0 旧版为黑框命令行，v1.1.0 起默认 GUI）：
 1. 调 GitHub API 拿 latest release
 2. 跟桌面副本的 `manifest.json` version 比对
-3. 不一样就下载 zipball → 解压 → 覆盖 `steam-friend-picker/` 的 7 项运行文件
-4. 拉起 Edge 扩展页，你点一下「重新加载」生效
+3. 有新版就下载 → 解压 → 原子覆盖 `steam-friend-picker/` 的 7 项运行文件
+4. 自动拉起 Edge 扩展页，你点一下「重新加载」生效
 
 > 桌面副本本身就在 `%USERPROFILE%\Desktop\steam-friend-picker\`，Edge 加载的就是它。覆盖完即可生效，无需重启浏览器。
 

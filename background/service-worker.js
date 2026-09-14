@@ -815,6 +815,7 @@ async function getUpdateState() {
     latestVersion: null,
     latestTag: null,
     releaseUrl: null,
+    releaseNotes: null,
     publishedAt: null,
     zipballUrl: null,
     hasUpdate: false,
@@ -877,6 +878,7 @@ async function checkForUpdate(opts = {}) {
     newState.latestVersion = latestVersion;
     newState.latestTag = data.tag_name || '';
     newState.releaseUrl = data.html_url || null;
+    newState.releaseNotes = (data.body || '').slice(0, 600);
     newState.zipballUrl = data.zipball_url || null;
     newState.publishedAt = data.published_at || null;
     newState.hasUpdate = cmp > 0;

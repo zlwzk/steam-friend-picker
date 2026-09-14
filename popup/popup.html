@@ -22,13 +22,26 @@
     </header>
 
     <div id="update-banner" class="update-banner hidden">
-      <div class="update-banner-text">
-        <b>🆕 新版本可用</b>
-        <span id="update-banner-detail">v?.?.? · ????-??-??</span>
+      <div class="update-banner-head" id="update-banner-head" title="点击展开/收起更新说明">
+        <div class="update-banner-text">
+          <b>🆕 新版本可用</b>
+          <span id="update-banner-detail">v?.?.? · ????-??-??</span>
+        </div>
+        <span class="update-banner-arrow" id="update-banner-arrow">▾</span>
       </div>
-      <div class="update-banner-actions">
-        <button id="btn-update-open" class="btn btn-primary btn-small">打开更新页</button>
-        <button id="btn-update-dismiss" class="btn btn-mute btn-small">忽略</button>
+      <div class="update-banner-body hidden" id="update-banner-body">
+        <div class="update-notes-label">更新内容</div>
+        <div class="update-notes" id="update-release-notes">…</div>
+        <div class="update-notes-label">怎么更新（3 步）</div>
+        <ol class="update-steps">
+          <li>双击桌面 <code>update.bat</code>（可视化更新器，有进度条）</li>
+          <li>等它显示「✓ 更新完成」，会自动打开扩展页</li>
+          <li>在本扩展卡片上点一下「重新加载」↻ 即生效</li>
+        </ol>
+        <div class="update-banner-actions">
+          <button id="btn-update-open" class="btn btn-primary btn-small">打开发布页</button>
+          <button id="btn-update-dismiss" class="btn btn-mute btn-small">忽略</button>
+        </div>
       </div>
     </div>
 

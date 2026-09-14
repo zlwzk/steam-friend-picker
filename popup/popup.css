@@ -64,17 +64,42 @@ h1 { font-size: 15px; margin: 0; color: var(--accent); }
 
 /* ====== 更新横幅 ====== */
 .update-banner {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 12px;
+  display: flex; flex-direction: column;
   background: linear-gradient(90deg, rgba(225, 175, 90, 0.22), rgba(225, 175, 90, 0.08));
   border-bottom: 1px solid rgba(225, 175, 90, 0.35);
   font-size: 12px;
 }
 .update-banner.hidden { display: none; }
+.update-banner-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; cursor: pointer; user-select: none;
+}
+.update-banner-head:hover { background: rgba(225, 175, 90, 0.08); }
 .update-banner-text { display: flex; flex-direction: column; gap: 2px; color: var(--fg); }
 .update-banner-text b { color: var(--warn); }
 .update-banner-text #update-banner-detail { color: var(--fg-2); font-size: 11px; }
-.update-banner-actions { display: flex; gap: 5px; flex-shrink: 0; }
+.update-banner-arrow { color: var(--fg-3); font-size: 11px; transition: transform 0.15s; }
+.update-banner.open .update-banner-arrow { transform: rotate(180deg); }
+.update-banner-body { padding: 0 12px 10px; display: flex; flex-direction: column; gap: 5px; }
+.update-banner-body.hidden { display: none; }
+.update-notes-label {
+  font-size: 10px; font-weight: 700; color: var(--fg-3);
+  text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px;
+}
+.update-notes {
+  background: var(--bg-3); border-radius: 6px; padding: 7px 9px;
+  font-size: 11px; line-height: 1.55; color: var(--fg-2);
+  max-height: 150px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;
+}
+.update-steps {
+  margin: 0; padding-left: 20px;
+  font-size: 11px; line-height: 1.7; color: var(--fg-2);
+}
+.update-steps code {
+  background: var(--bg-3); padding: 1px 5px; border-radius: 4px;
+  font-family: Consolas, monospace; font-size: 10.5px; color: var(--warn);
+}
+.update-banner-actions { display: flex; gap: 5px; margin-top: 6px; }
 
 .status-bar { display: flex; flex-wrap: wrap; gap: 5px; }
 .badge {
