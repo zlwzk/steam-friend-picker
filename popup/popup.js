@@ -818,6 +818,12 @@ chrome.runtime.onMessage.addListener((msg) => {
 
 // ==================== 初始化 ====================
 async function init() {
+  // 版本徽章：直接读本地 manifest（不依赖 SW 响应，避免显示占位旧版本号）
+  try {
+    const mv = chrome.runtime.getManifest().version;
+    $('#version-badge').textContent = `v${mv}`;
+  } catch (e) { /* ignore */ }
+
   // refreshStatus 抛错不能阻止后续事件绑定（否则「按钮无反应」）
   try {
     await refreshStatus();
