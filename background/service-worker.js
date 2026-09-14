@@ -47,7 +47,12 @@ const DEFAULT_SETTINGS = {
   skipBlacklist: true,               // 入队前跳过黑名单
   skipAlreadyFriends: true,          // 入队前跳过已知好友
   autoAddBlockedToBlacklist: true,   // 被 Block 自动进黑名单
-  theme: 'dark'                      // dark / light
+  theme: 'dark',                     // dark / light
+
+  // 自动更新
+  autoCheckUpdate: true,             // 启用定时检查 GitHub release
+  checkUpdateIntervalHours: 6,       // 检查频率（小时）
+  notifyUpdate: true                 // 发现新版本桌面通知
 };
 
 const STATE = {
@@ -740,6 +745,22 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           sendResponse({ dailyCounts: await getDailyCounts(), today: todayStr() });
           break;
         }
+        case 'SFP_CHECK_UPDATE': {
+          checkForUpdate({ force: true }).then(r => sendResponse(r)).catch(e => sendResponse({ error: String(e) }));
+          break;
+        }
+        case 'SFP_UPDATE_STATE': {
+          const state = await getUpdateState();
+          sendResponse({ state, currentVersion: getCurrentVersion() });
+          break;
+        }
+        case 'SFP_OPEN_RELEASE': {
+          const state = await getUpdateState();
+          const url = state.releaseUrl || 'https://github.com/zlwzk/steam-friend-picker/releases';
+          await chrome.tabs.create({ url });
+          sendResponse({ ok: true, url });
+          break;
+        }
         default:
           sendResponse({ error: 'unknown message type: ' + (msg && msg.type) });
       }
@@ -752,4 +773,179 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
 chrome.runtime.onInstalled.addListener(async () => {
   await saveSettings(await getSettings());
+  await setupUpdateAlarm();
+  await checkForUpdate({ silent: true, force: true });
+});
+
+const UPDATE_STATE_KEY = 'sfp_update_state';
+const UPDATE_NOTIFIED_KEY = 'sfp_update_notified';
+const ALARM_NAME = 'sfp_update_check';
+const GITHUB_API_LATEST = 'https://api.github.com/repos/zlwzk/steam-friend-picker/releases/latest';
+
+// ---------- 自动更新 ----------
+function getCurrentVersion() {
+  try { return chrome.runtime.getManifest().version || '0.0.0'; } catch (e) { return '0.0.0'; }
+}
+
+/** 比较 semver "1.2.3" -> -1 / 0 / 1 */
+function compareVersions(a, b) {
+  const pa = String(a || '0.0.0').split('.').map(n => parseInt(n, 10) || 0);
+  const pb = String(b || '0.0.0').split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const da = pa[i] || 0, db = pb[i] || 0;
+    if (da > db) return 1;
+    if (da < db) return -1;
+  }
+  return 0;
+}
+
+/** 从 "v1.2.3" / "1.2.3" 提取 "1.2.3" */
+function stripTagPrefix(tag) {
+  return String(tag || '').replace(/^v/i, '').trim();
+}
+
+async function getUpdateState() {
+  const { [UPDATE_STATE_KEY]: s } = await chrome.storage.local.get(UPDATE_STATE_KEY);
+  return s || {
+    currentVersion: getCurrentVersion(),
+    latestVersion: null,
+    latestTag: null,
+    releaseUrl: null,
+    publishedAt: null,
+    zipballUrl: null,
+    hasUpdate: false,
+    lastCheckedAt: 0,
+    lastError: null
+  };
+}
+
+async function setUpdateState(s) {
+  await chrome.storage.local.set({ [UPDATE_STATE_KEY]: s });
+}
+
+async function getNotifiedTag() {
+  const { [UPDATE_NOTIFIED_KEY]: t } = await chrome.storage.local.get(UPDATE_NOTIFIED_KEY);
+  return t || '';
+}
+async function setNotifiedTag(tag) {
+  await chrome.storage.local.set({ [UPDATE_NOTIFIED_KEY]: tag });
+}
+
+/**
+ * 检查 GitHub latest release
+ * opts.silent: true 表示被定时器/启动触发，不主动弹通知（已通过通知去重）
+ * opts.force: true 表示跳过最小间隔节流
+ */
+async function checkForUpdate(opts = {}) {
+  const state = await getUpdateState();
+  const settings = await getSettings();
+  const now = Date.now();
+
+  // 节流：默认 30 分钟内不重复查（手动按钮可 force）
+  if (!opts.force && state.lastCheckedAt && (now - state.lastCheckedAt) < 30 * 60 * 1000) {
+    return { skipped: 'too-soon', state };
+  }
+
+  let newState = { ...state, currentVersion: getCurrentVersion(), lastCheckedAt: now };
+
+  try {
+    const r = await fetch(GITHUB_API_LATEST, {
+      headers: { 'Accept': 'application/vnd.github+json' },
+      cache: 'no-store'
+    });
+    if (r.status === 404) {
+      newState.lastError = '尚无 release';
+      newState.hasUpdate = false;
+      await setUpdateState(newState);
+      await broadcast({ type: 'SFP_UPDATE_STATE', payload: newState });
+      return { ok: true, state: newState, noRelease: true };
+    }
+    if (!r.ok) {
+      newState.lastError = `HTTP_${r.status}`;
+      await setUpdateState(newState);
+      await broadcast({ type: 'SFP_UPDATE_STATE', payload: newState });
+      return { error: `github api ${r.status}` };
+    }
+    const data = await r.json();
+    const latestVersion = stripTagPrefix(data.tag_name);
+    const cmp = compareVersions(latestVersion, newState.currentVersion);
+
+    newState.latestVersion = latestVersion;
+    newState.latestTag = data.tag_name || '';
+    newState.releaseUrl = data.html_url || null;
+    newState.zipballUrl = data.zipball_url || null;
+    newState.publishedAt = data.published_at || null;
+    newState.hasUpdate = cmp > 0;
+    newState.lastError = null;
+
+    await setUpdateState(newState);
+    await broadcast({ type: 'SFP_UPDATE_STATE', payload: newState });
+
+    // 弹桌面通知（仅在新版本 + 没通知过同 tag + 设置允许）
+    if (newState.hasUpdate && settings.notifyUpdate && !opts.silent) {
+      const prevNotified = await getNotifiedTag();
+      if (prevNotified !== newState.latestTag) {
+        await notifyUpdateAvailable(newState);
+        await setNotifiedTag(newState.latestTag);
+      }
+    }
+
+    return { ok: true, state: newState };
+  } catch (e) {
+    newState.lastError = String(e && e.message || e);
+    await setUpdateState(newState);
+    await broadcast({ type: 'SFP_UPDATE_STATE', payload: newState });
+    return { error: newState.lastError };
+  }
+}
+
+async function notifyUpdateAvailable(state) {
+  try {
+    await chrome.notifications.create('sfp_update_available', {
+      type: 'basic',
+      iconUrl: 'icons/128.png',
+      title: `Steam 好友收割机 · 新版本 v${state.latestVersion}`,
+      message: `当前 v${state.currentVersion} → 最新 v${state.latestVersion}。点击查看更新说明与下载。`,
+      priority: 1
+    });
+  } catch (e) { /* 权限未授予 */ }
+}
+
+async function setupUpdateAlarm() {
+  const settings = await getSettings();
+  if (!settings.autoCheckUpdate) {
+    chrome.alarms.clear(ALARM_NAME);
+    return;
+  }
+  const hours = Math.max(1, Math.min(168, settings.checkUpdateIntervalHours || 6));
+  chrome.alarms.create(ALARM_NAME, {
+    delayInMinutes: 1,                       // 安装后 1 分钟先跑一次
+    periodInMinutes: hours * 60
+  });
+}
+
+// ---------- 闹钟 ----------
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name === ALARM_NAME) {
+    await checkForUpdate({ silent: true });
+  }
+});
+
+// ---------- 通知点击 ----------
+chrome.notifications.onClicked.addListener(async (notifId) => {
+  if (notifId === 'sfp_update_available') {
+    const state = await getUpdateState();
+    if (state.releaseUrl) {
+      await chrome.tabs.create({ url: state.releaseUrl });
+    } else {
+      await chrome.tabs.create({ url: 'https://github.com/zlwzk/steam-friend-picker/releases' });
+    }
+    chrome.notifications.clear(notifId);
+  }
+});
+
+// ---------- 启动时初始化 ----------
+chrome.runtime.onStartup.addListener(async () => {
+  await setupUpdateAlarm();
+  await checkForUpdate({ silent: true });
 });

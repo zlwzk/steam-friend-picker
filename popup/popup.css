@@ -54,7 +54,27 @@ body {
 }
 .title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 h1 { font-size: 15px; margin: 0; color: var(--accent); }
-.ver { font-size: 10px; color: var(--fg-3); }
+.ver { font-size: 10px; color: var(--fg-3); cursor: pointer; user-select: none; }
+.ver:hover { color: var(--accent); }
+.ver.update-available { color: var(--warn); animation: pulse-warn 2s infinite; }
+@keyframes pulse-warn {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* ====== 更新横幅 ====== */
+.update-banner {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px;
+  background: linear-gradient(90deg, rgba(225, 175, 90, 0.22), rgba(225, 175, 90, 0.08));
+  border-bottom: 1px solid rgba(225, 175, 90, 0.35);
+  font-size: 12px;
+}
+.update-banner.hidden { display: none; }
+.update-banner-text { display: flex; flex-direction: column; gap: 2px; color: var(--fg); }
+.update-banner-text b { color: var(--warn); }
+.update-banner-text #update-banner-detail { color: var(--fg-2); font-size: 11px; }
+.update-banner-actions { display: flex; gap: 5px; flex-shrink: 0; }
 
 .status-bar { display: flex; flex-wrap: wrap; gap: 5px; }
 .badge {

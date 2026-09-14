@@ -20,7 +20,8 @@ const DEFAULT_SETTINGS_SHAPE = {
   dailyQuota: 50, enableTimeWindow: false, timeWindowStart: 9, timeWindowEnd: 23,
   adaptiveInterval: true, notifyComplete: true,
   skipBlacklist: true, skipAlreadyFriends: true, autoAddBlockedToBlacklist: true,
-  theme: 'dark'
+  theme: 'dark',
+  autoCheckUpdate: true, checkUpdateIntervalHours: 6, notifyUpdate: true
 };
 
 // ==================== 工具 ====================
@@ -119,6 +120,9 @@ async function refreshStatus() {
   $('#skip-blacklist').checked = state.settings.skipBlacklist !== false;
   $('#skip-friends').checked = state.settings.skipAlreadyFriends !== false;
   $('#auto-blacklist').checked = state.settings.autoAddBlockedToBlacklist !== false;
+  $('#auto-check-update').checked = state.settings.autoCheckUpdate !== false;
+  $('#check-update-interval').value = state.settings.checkUpdateIntervalHours ?? 6;
+  $('#notify-update').checked = state.settings.notifyUpdate !== false;
   document.body.dataset.theme = state.settings.theme || 'dark';
   const themeRadio = document.querySelector(`input[name="theme"][value="${state.settings.theme || 'dark'}"]`);
   if (themeRadio) themeRadio.checked = true;
@@ -456,7 +460,10 @@ async function saveSettings() {
     skipBlacklist: $('#skip-blacklist').checked,
     skipAlreadyFriends: $('#skip-friends').checked,
     autoAddBlockedToBlacklist: $('#auto-blacklist').checked,
-    theme: document.querySelector('input[name="theme"]:checked')?.value || 'dark'
+    theme: document.querySelector('input[name="theme"]:checked')?.value || 'dark',
+    autoCheckUpdate: $('#auto-check-update').checked,
+    checkUpdateIntervalHours: Math.max(1, Math.min(168, parseInt($('#check-update-interval').value, 10) || 6)),
+    notifyUpdate: $('#notify-update').checked
   };
   // 验证 min ≤ max
   if (settings.intervalMinMs > settings.intervalMaxMs) {
@@ -676,6 +683,97 @@ async function addToWhitelistFromInput() {
   await refreshStatus();
 }
 
+// ==================== 自动更新 ====================
+function fmtDate(isoStr) {
+  if (!isoStr) return '';
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return '';
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  } catch (e) { return ''; }
+}
+
+function relTime(ms) {
+  if (!ms) return '从未';
+  const diff = Date.now() - ms;
+  if (diff < 60 * 1000) return `${Math.floor(diff / 1000)} 秒前`;
+  if (diff < 3600 * 1000) return `${Math.floor(diff / 60000)} 分钟前`;
+  if (diff < 86400 * 1000) return `${Math.floor(diff / 3600000)} 小时前`;
+  return `${Math.floor(diff / 86400000)} 天前`;
+}
+
+async function loadUpdateState() {
+  try {
+    const r = await chrome.runtime.sendMessage({ type: 'SFP_UPDATE_STATE' });
+    if (r && r.state) renderUpdateBanner(r.state);
+    if (r && r.currentVersion) {
+      const badge = $('#version-badge');
+      badge.textContent = `v${r.currentVersion}`;
+      badge.title = `当前 v${r.currentVersion} · 点击立即检查更新`;
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function renderUpdateBanner(s) {
+  if (!s) return;
+  const banner = $('#update-banner');
+  const badge = $('#version-badge');
+  const hint = $('#update-status-hint');
+
+  // 版本徽章样式：有更新时变橙色
+  if (s.hasUpdate) {
+    badge.classList.add('update-available');
+    badge.title = `当前 v${s.currentVersion} → 最新 v${s.latestVersion} · 点击立即检查更新`;
+  } else {
+    badge.classList.remove('update-available');
+  }
+
+  // Banner
+  if (s.hasUpdate) {
+    const date = fmtDate(s.publishedAt);
+    $('#update-banner-detail').textContent = `v${s.latestVersion} · ${date || '已发布'} · 当前 v${s.currentVersion}`;
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
+  }
+
+  // 设置页 hint
+  if (hint) {
+    if (s.lastError) {
+      hint.textContent = `检查失败：${s.lastError} · 上次 ${relTime(s.lastCheckedAt)}`;
+    } else if (!s.latestVersion) {
+      hint.textContent = `尚未检查过（首次安装 1 分钟后会自动跑）`;
+    } else {
+      const cmp = s.hasUpdate ? '🆕 有新版本' : '✓ 已是最新';
+      hint.textContent = `${cmp} v${s.latestVersion} · 上次检查 ${relTime(s.lastCheckedAt)}`;
+    }
+  }
+}
+
+async function manualCheckUpdate() {
+  const btn = $('#btn-check-update');
+  const oldText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ 检查中…';
+  try {
+    const r = await chrome.runtime.sendMessage({ type: 'SFP_CHECK_UPDATE' });
+    if (r && r.error) {
+      toast('检查失败：' + r.error, 'error', 4000);
+    } else if (r && r.noRelease) {
+      toast('GitHub 仓库尚未发布任何 release', 'warn', 4000);
+    } else if (r && r.state) {
+      renderUpdateBanner(r.state);
+      if (r.state.hasUpdate) toast(`🆕 发现新版本 v${r.state.latestVersion}`, 'success', 4000);
+      else toast(`✓ 已是最新 v${r.state.latestVersion}`, 'success', 3000);
+    }
+  } catch (e) {
+    toast('检查出错：' + (e.message || e), 'error', 4000);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+}
+
 // ==================== 监听后台进度 ====================
 chrome.runtime.onMessage.addListener((msg) => {
   if (!msg || !msg.type) return;
@@ -705,6 +803,8 @@ chrome.runtime.onMessage.addListener((msg) => {
       toast(`完成 ✓${s.success} · 友${s.already} · 邀${s.invited} · 限${s.ratelimited} · 败${s.failed}`, 'success', 4000);
     }
     refreshStatus();
+  } else if (msg.type === 'SFP_UPDATE_STATE') {
+    renderUpdateBanner(msg.payload);
   }
 });
 
@@ -764,7 +864,8 @@ async function init() {
   // 设置（全部 onchange 自动保存）
   ['interval-min','interval-max','max-per-run','daily-quota','max-retries',
    'retry-ratelimit','adaptive-interval','enable-time-window','time-start','time-end',
-   'notify-complete','skip-blacklist','skip-friends','auto-blacklist'].forEach(id => {
+   'notify-complete','skip-blacklist','skip-friends','auto-blacklist',
+   'auto-check-update','check-update-interval','notify-update'].forEach(id => {
     $(`#${id}`).onchange = saveSettings;
   });
   $$('input[name="theme"]').forEach(r => r.onchange = saveSettings);
@@ -775,10 +876,20 @@ async function init() {
   $('#btn-import-csv').onclick = importText;
   $('#btn-import-backup').onclick = importBackup;
 
+  // 自动更新
+  $('#btn-check-update').onclick = manualCheckUpdate;
+  $('#btn-open-release').onclick = () => chrome.runtime.sendMessage({ type: 'SFP_OPEN_RELEASE' });
+  $('#btn-update-open').onclick = () => chrome.runtime.sendMessage({ type: 'SFP_OPEN_RELEASE' });
+  $('#btn-update-dismiss').onclick = () => { $('#update-banner').classList.add('hidden'); };
+  $('#version-badge').onclick = manualCheckUpdate;
+
   // 重绘图表（主题切换 / 窗口大小变化时）
   window.addEventListener('resize', () => { if (state.activeTab === 'backup') drawDailyChart(); });
   new MutationObserver(() => { if (state.activeTab === 'backup') drawDailyChart(); })
     .observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });
+
+  // 加载更新状态
+  await loadUpdateState();
 }
 
 init();

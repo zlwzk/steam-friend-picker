@@ -10,7 +10,7 @@
     <header class="topbar">
       <div class="title-row">
         <h1>🎮 Steam 好友收割机</h1>
-        <span class="ver">v0.2.0</span>
+        <span class="ver" id="version-badge" title="点击检查更新">v1.0.0</span>
       </div>
       <div class="status-bar">
         <span id="login-status" class="badge badge-warn">检测中…</span>
@@ -20,6 +20,17 @@
         <span class="badge badge-info" id="today-quota-badge">今日 0/50</span>
       </div>
     </header>
+
+    <div id="update-banner" class="update-banner hidden">
+      <div class="update-banner-text">
+        <b>🆕 新版本可用</b>
+        <span id="update-banner-detail">v?.?.? · ????-??-??</span>
+      </div>
+      <div class="update-banner-actions">
+        <button id="btn-update-open" class="btn btn-primary btn-small">打开更新页</button>
+        <button id="btn-update-dismiss" class="btn btn-mute btn-small">忽略</button>
+      </div>
+    </div>
 
     <nav class="tab-bar" role="tablist">
       <button class="tab-btn active" data-tab="queue">📋 队列</button>
@@ -160,6 +171,30 @@
           <label>自动学习</label>
           <label class="check-label"><input type="checkbox" id="auto-blacklist" checked> 被 Block 自动进黑名单</label>
         </div>
+
+        <h2 class="sub-title">自动更新</h2>
+        <div class="setting-grid">
+          <label>启用自动检查</label>
+          <label class="check-label"><input type="checkbox" id="auto-check-update" checked> 后台定时检查 GitHub 最新 release</label>
+        </div>
+        <div class="setting-grid">
+          <label>检查频率</label>
+          <span>
+            每 <input type="number" id="check-update-interval" min="1" max="168" value="6" style="width:48px"> 小时查一次
+          </span>
+        </div>
+        <div class="setting-grid">
+          <label>通知</label>
+          <label class="check-label"><input type="checkbox" id="notify-update" checked> 发现新版本弹桌面通知</label>
+        </div>
+        <div class="setting-grid">
+          <label>手动检查</label>
+          <span>
+            <button id="btn-check-update" class="btn btn-secondary btn-small">🔄 立即检查更新</button>
+            <button id="btn-open-release" class="btn btn-mute btn-small">📄 打开 release 页</button>
+          </span>
+        </div>
+        <div class="hint" id="update-status-hint">未检查</div>
 
         <h2 class="sub-title">外观</h2>
         <div class="setting-grid">

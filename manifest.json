@@ -1,21 +1,26 @@
 {
   "manifest_version": 3,
   "name": "Steam 好友收割机",
-  "version": "0.2.0",
-  "description": "从小黑盒文章评论区、Steam 个人主页 / 群组成员 / 搜索结果批量抓取 Steam 好友代码，自动加好友。含黑名单、日配额、自适应间隔、JSON 全量备份。",
+  "version": "1.0.0",
+  "description": "从小黑盒文章评论区、Steam 个人主页 / 群组成员 / 搜索结果批量抓取 Steam 好友代码，自动加好友。含黑名单、日配额、自适应间隔、JSON 全量备份、自动检查更新。",
   "permissions": [
     "storage",
     "cookies",
     "tabs",
     "scripting",
-    "notifications"
+    "notifications",
+    "alarms"
   ],
   "host_permissions": [
     "https://steamcommunity.com/*",
     "https://store.steampowered.com/*",
     "https://*.xiaoheihe.cn/*",
-    "https://api.xiaoheihe.cn/*"
+    "https://api.xiaoheihe.cn/*",
+    "https://api.github.com/*",
+    "https://codeload.github.com/*",
+    "https://github.com/*"
   ],
+  "update_url": "https://github.com/zlwzk/steam-friend-picker/releases",
   "background": {
     "service_worker": "background/service-worker.js"
   },
