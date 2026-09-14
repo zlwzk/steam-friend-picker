@@ -105,16 +105,15 @@ async function refreshStatus() {
     sendMsg({ type: 'SFP_TRIED_GET' }),
     sendMsg({ type: 'SFP_BLACKLIST_GET' }),
     sendMsg({ type: 'SFP_WHITELIST_GET' }),
-    sendMsg({ type: 'SFP_STATUS' })
+    sendMsg({ type: 'SFP_FRIENDS_GET' })
   ]);
   state.tried = triedResp.tried || {};
   state.blacklist = blResp.blacklist || {};
   state.whitelist = wlResp.whitelist || {};
+  state.friends = frResp.friends || {};
 
-  // 登录态
-  sendMsg({ type: 'SFP_LOGIN_CHECK' })
-    .then(r => { state.loggedIn = !!r.loggedIn; renderBadges(); })
-    .catch(() => { state.loggedIn = false; renderBadges(); });
+  // 登录态（异步，不阻塞渲染）
+  checkLogin();
 
   // 设置输入框
   $('#interval-min').value = Math.round((state.settings.intervalMinMs || 8000) / 1000);
@@ -151,11 +150,37 @@ async function refreshStatus() {
   renderStats();
 }
 
+/** 打开 popup 时自动清理队列：已是好友 / 黑名单 / 已处理过的移出队列 */
+async function pruneQueueOnOpen() {
+  try {
+    const r = await sendMsg({ type: 'SFP_QUEUE_PRUNE', refreshFriends: true });
+    if (!r) return;
+    if (r.friendsRefreshed > 0) {
+      state.friends = (await sendMsg({ type: 'SFP_FRIENDS_GET' })).friends || {};
+    }
+    if (r.removedTotal > 0) {
+      const parts = [];
+      if (r.removedFriend) parts.push(`已是好友 ${r.removedFriend}`);
+      if (r.removedBlacklist) parts.push(`黑名单 ${r.removedBlacklist}`);
+      if (r.removedTried) parts.push(`已处理 ${r.removedTried}`);
+      toast(`队列已清理 ${r.removedTotal} 个（${parts.join(' · ')}）`, 'info', 4000);
+      await refreshStatus();
+    }
+  } catch (e) { /* SW 忙或未就绪，跳过 */ }
+}
+
 // ==================== Badges ====================
+function checkLogin() {
+  return sendMsg({ type: 'SFP_LOGIN_CHECK' })
+    .then(r => { state.loggedIn = !!r.loggedIn; })
+    .catch(() => { state.loggedIn = false; })
+    .then(() => renderBadges());
+}
+
 function renderBadges() {
   const ls = $('#login-status');
-  if (state.loggedIn) { ls.textContent = '✓ 已登录'; ls.className = 'badge badge-ok'; }
-  else { ls.textContent = '✗ 未登录'; ls.className = 'badge badge-err'; }
+  if (state.loggedIn) { ls.textContent = '✓ 已登录'; ls.className = 'badge badge-ok'; ls.title = '点击重新检测登录态'; }
+  else { ls.textContent = '✗ 未登录 · 点此登录'; ls.className = 'badge badge-err badge-click'; ls.title = '打开 Steam 社区登录页'; }
   const rs = $('#running-status');
   if (state.running) { rs.textContent = '⚡ 运行中'; rs.className = 'badge badge-ok'; }
   else { rs.textContent = '● 空闲'; rs.className = 'badge badge-mute'; }
@@ -207,6 +232,11 @@ function renderQueue() {
   const groupFilter = state.filter.queueGroup;
 
   let items = state.queue.slice();
+  // 过滤器增强：已是好友 / 黑名单中的不再出现在队列里（双保险，真实清理在 SW pruneQueue）
+  items = items.filter(it => {
+    const id = typeof it === 'string' ? it : it.id;
+    return !state.blacklist[id] && !state.friends[id];
+  });
   if (search) items = items.filter(it => {
     const id = typeof it === 'string' ? it : it.id;
     const src = (typeof it === 'object' && it.source) ? it.source : '';
@@ -861,6 +891,23 @@ async function init() {
     console.error('[SFP] init refreshStatus failed:', e);
     toast('初始加载失败：' + ((e && e.message) || e), 'error', 4000);
   }
+
+  // 队列自动清理：已是好友 / 黑名单 / 已处理过的直接移出队列（好友对照表顺带刷新，10 分钟节流）
+  pruneQueueOnOpen();
+
+  // 登录入口：点「未登录」徽章打开 Steam 登录页；点「已登录」重新检测
+  const loginBadge = $('#login-status');
+  loginBadge.onclick = async () => {
+    if (state.loggedIn) {
+      loginBadge.textContent = '… 检测中';
+      await checkLogin();
+      return;
+    }
+    chrome.tabs.create({ url: 'https://steamcommunity.com/login/' });
+    toast('已打开 Steam 登录页，登录完成后回到这里点徽章重检', 'info', 4000);
+  };
+  // popup 打开期间每 20 秒自动重检登录态（在别的标签页登录后这里会自己变绿）
+  setInterval(() => { checkLogin(); }, 20000);
 
   // Tab
   $$('.tab-btn').forEach(b => b.onclick = () => switchTab(b.dataset.tab));

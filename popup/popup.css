@@ -141,6 +141,8 @@ h1 { font-size: 15px; margin: 0; color: var(--accent); }
 .badge-warn { background: rgba(225, 175, 90, 0.18); color: var(--warn); }
 .badge-info { background: var(--bg-3); color: var(--fg); }
 .badge-mute { background: var(--bg-3); color: var(--fg-3); }
+.badge-click { cursor: pointer; }
+.badge-click:hover { filter: brightness(1.3); }
 .badge b { color: var(--accent); font-weight: 700; }
 body[data-theme="light"] .badge-ok { background: rgba(27, 105, 192, 0.12); }
 body[data-theme="light"] .badge-err { background: rgba(214, 48, 48, 0.12); }

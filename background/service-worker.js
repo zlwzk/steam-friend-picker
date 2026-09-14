@@ -29,6 +29,7 @@ const WHITELIST_KEY = 'sfp_whitelist';
 const FRIENDS_KEY = 'sfp_known_friends';
 const PROFILE_CACHE_KEY = 'sfp_profile_cache';
 const DAILY_KEY = 'sfp_daily_count';
+const SNAP_TS_KEY = 'sfp_friends_snapshot_at';
 
 const DEFAULT_SETTINGS = {
   intervalMinMs: 8000,
@@ -143,10 +144,14 @@ async function checkLoggedIn() {
   const sid = await getSessionIdFromCookie();
   if (!sid) return false;
   try {
+    // 不能用 redirect:'manual'：SW 里会返回 opaqueredirect（status 恒为 0），永远误判未登录。
+    // 改为 follow：已登录 /my/ 落到 /profiles/<id>/ 或 /id/<vanity>/；未登录落到 /login/…
     const r = await fetch('https://steamcommunity.com/my/', {
-      credentials: 'include', redirect: 'manual', cache: 'no-store'
+      credentials: 'include', redirect: 'follow', cache: 'no-store'
     });
-    return r.status === 200;
+    if (r.status !== 200) return false;
+    const u = r.url || '';
+    return /\/profiles\/\d{17}/.test(u) || /\/id\/[^/?#]+/.test(u);
   } catch (e) { return false; }
 }
 async function addFriendAjax(steamid64, sessionid) {
@@ -328,6 +333,47 @@ async function enqueueIds(ids, source, sourceType) {
   }
   await setQueue(queue);
   return { added, duplicate, skippedBlacklist, skippedWhitelist, skippedFriend, skippedInvalid, queueSize: queue.length, addedItems };
+}
+
+/** 清理队列：把已是好友 / 黑名单 / 已处理过的条目从队列里真正移除（不再显示） */
+async function pruneQueue(opts) {
+  const [queue, blacklist, friends, tried, settings] = await Promise.all([
+    getQueue(), getBlacklist(), getKnownFriends(), getTried(), getSettings()
+  ]);
+
+  // 可选：先刷新一遍自己的好友列表快照，保证「已是好友」判断不过期（10 分钟节流）
+  let friendsRefreshed = 0;
+  if (opts && opts.refreshFriends) {
+    const st = await chrome.storage.local.get(SNAP_TS_KEY);
+    const last = st[SNAP_TS_KEY] || 0;
+    if (Date.now() - last > 10 * 60 * 1000) {
+      const r = await snapshotFriendsList(); // 无参 = 自己
+      if (r && !r.error) {
+        friendsRefreshed = r.count || 0;
+        await chrome.storage.local.set({ [SNAP_TS_KEY]: Date.now() });
+      }
+    }
+  }
+
+  const before = queue.length;
+  const removed = { friend: 0, blacklist: 0, tried: 0 };
+  const kept = [];
+  for (const item of queue) {
+    const id = typeof item === 'string' ? item : item.id;
+    if (settings.skipBlacklist !== false && blacklist[id]) { removed.blacklist++; continue; }
+    if (settings.skipAlreadyFriends !== false && friends[id]) { removed.friend++; continue; }
+    if (tried[id]) { removed.tried++; continue; }
+    kept.push(item);
+  }
+  if (kept.length !== before) await setQueue(kept);
+  return {
+    removedTotal: before - kept.length,
+    removedFriend: removed.friend,
+    removedBlacklist: removed.blacklist,
+    removedTried: removed.tried,
+    friendsRefreshed,
+    queueSize: kept.length
+  };
 }
 
 // ---------- 主调度 ----------
@@ -695,6 +741,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         }
         case 'SFP_LOGIN_CHECK': {
           sendResponse({ loggedIn: await checkLoggedIn() });
+          break;
+        }
+        case 'SFP_QUEUE_PRUNE': {
+          sendResponse(await pruneQueue({ refreshFriends: !!msg.refreshFriends }));
           break;
         }
         case 'SFP_TRIED_GET': {
