@@ -639,6 +639,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           sendResponse({ blacklist: await getBlacklist() });
           break;
         }
+        case 'SFP_FRIENDS_GET': {
+          sendResponse({ friends: await getKnownFriends() });
+          break;
+        }
         case 'SFP_BLACKLIST_ADD': {
           const r = await addToBlacklist(msg.steamid, msg.reason || 'manual', false);
           sendResponse(r);

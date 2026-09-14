@@ -73,7 +73,7 @@ async function extractIdsFromText(text) {
   }
   if (vanity.size > 0) {
     try {
-      const r = await chrome.runtime.sendMessage({ type: 'SFP_RESOLVE_VANITY', slugs: Array.from(vanity) });
+      const r = await sendMsg({ type: 'SFP_RESOLVE_VANITY', slugs: Array.from(vanity) });
       Object.values((r && r.map) || {}).forEach(id => { if (id) direct.add(id); });
     } catch (e) { /* ignore */ }
   }
@@ -82,7 +82,7 @@ async function extractIdsFromText(text) {
 
 // ==================== 状态刷新 ====================
 async function refreshStatus() {
-  const resp = await chrome.runtime.sendMessage({ type: 'SFP_STATUS' });
+  const resp = await sendMsg({ type: 'SFP_STATUS' });
   state.queue = resp.queue || [];
   state.settings = { ...DEFAULT_SETTINGS_SHAPE, ...(resp.settings || {}) };
   state.running = !!resp.running;
@@ -91,17 +91,17 @@ async function refreshStatus() {
   state.todayCount = resp.todayCount || 0;
 
   const [triedResp, blResp, wlResp, frResp] = await Promise.all([
-    chrome.runtime.sendMessage({ type: 'SFP_TRIED_GET' }),
-    chrome.runtime.sendMessage({ type: 'SFP_BLACKLIST_GET' }),
-    chrome.runtime.sendMessage({ type: 'SFP_WHITELIST_GET' }),
-    chrome.runtime.sendMessage({ type: 'SFP_STATUS' })
+    sendMsg({ type: 'SFP_TRIED_GET' }),
+    sendMsg({ type: 'SFP_BLACKLIST_GET' }),
+    sendMsg({ type: 'SFP_WHITELIST_GET' }),
+    sendMsg({ type: 'SFP_STATUS' })
   ]);
   state.tried = triedResp.tried || {};
   state.blacklist = blResp.blacklist || {};
   state.whitelist = wlResp.whitelist || {};
 
   // 登录态
-  chrome.runtime.sendMessage({ type: 'SFP_LOGIN_CHECK' })
+  sendMsg({ type: 'SFP_LOGIN_CHECK' })
     .then(r => { state.loggedIn = !!r.loggedIn; renderBadges(); })
     .catch(() => { state.loggedIn = false; renderBadges(); });
 
@@ -259,7 +259,7 @@ function bindQueueItemEvents() {
   });
   $$('.queue-item .remove-btn').forEach(btn => {
     btn.onclick = async () => {
-      await chrome.runtime.sendMessage({ type: 'SFP_REMOVE_FROM_QUEUE', steamid: btn.dataset.id });
+      await sendMsg({ type: 'SFP_REMOVE_FROM_QUEUE', steamid: btn.dataset.id });
       state.selected.delete(btn.dataset.id);
       await refreshStatus();
     };
@@ -344,7 +344,7 @@ function renderBlacklist() {
   `).join('');
   $$('.blacklist-item .id').forEach(el => el.onclick = () => chrome.tabs.create({ url: `https://steamcommunity.com/profiles/${el.dataset.id}` }));
   $$('.blacklist-item .remove-btn').forEach(btn => btn.onclick = async () => {
-    await chrome.runtime.sendMessage({ type: 'SFP_BLACKLIST_REMOVE', steamid: btn.dataset.id });
+    await sendMsg({ type: 'SFP_BLACKLIST_REMOVE', steamid: btn.dataset.id });
     toast('已移出黑名单', 'success');
     await refreshStatus();
   });
@@ -367,7 +367,7 @@ function renderWhitelist() {
   `).join('');
   $$('.whitelist-item .id').forEach(el => el.onclick = () => chrome.tabs.create({ url: `https://steamcommunity.com/profiles/${el.dataset.id}` }));
   $$('.whitelist-item .remove-btn').forEach(btn => btn.onclick = async () => {
-    await chrome.runtime.sendMessage({ type: 'SFP_WHITELIST_REMOVE', steamid: btn.dataset.id });
+    await sendMsg({ type: 'SFP_WHITELIST_REMOVE', steamid: btn.dataset.id });
     toast('已移出白名单', 'success');
     await refreshStatus();
   });
@@ -471,7 +471,7 @@ async function saveSettings() {
     await refreshStatus();
     return;
   }
-  await chrome.runtime.sendMessage({ type: 'SFP_SAVE_SETTINGS', settings });
+  await sendMsg({ type: 'SFP_SAVE_SETTINGS', settings });
   state.settings = { ...DEFAULT_SETTINGS_SHAPE, ...settings };
   if (settings.theme) document.body.dataset.theme = settings.theme;
   renderBadges();
@@ -506,7 +506,7 @@ async function scanCurrentPage() {
   catch (e) { toast('抓取失败：' + (e.message || e) + '\n请刷新目标页面重试', 'error', 4000); return; }
   const ids = (resp && resp.ids) || [];
   if (ids.length === 0) { toast('没找到 Steam ID', 'warn'); return; }
-  const enq = await chrome.runtime.sendMessage({ type: 'SFP_ENQUEUE', ids, source: url, sourceType });
+  const enq = await sendMsg({ type: 'SFP_ENQUEUE', ids, source: url, sourceType });
   toast(`抓到 ${ids.length} · 新增 ${enq.added} · 重复 ${enq.duplicate} · 黑名单 ${enq.skippedBlacklist || 0} · 已是好友 ${enq.skippedFriend || 0}`, 'success', 3500);
   state.selected.clear();
   await refreshStatus();
@@ -514,7 +514,7 @@ async function scanCurrentPage() {
 
 async function snapshotFriends() {
   toast('正在抓取你的好友列表…', 'info');
-  const r = await chrome.runtime.sendMessage({ type: 'SFP_SNAPSHOT_FRIENDS' });
+  const r = await sendMsg({ type: 'SFP_SNAPSHOT_FRIENDS' });
   if (r && r.error) { toast('失败：' + r.error, 'error', 4000); return; }
   toast(`已入库 ${r.count || 0} 个已知好友，入队时自动跳过`, 'success');
   await refreshStatus();
@@ -525,7 +525,7 @@ async function importText() {
   if (!text) return;
   const ids = await extractIdsFromText(text);
   if (ids.length === 0) { toast('没提取到任何 Steam ID', 'warn'); return; }
-  const r = await chrome.runtime.sendMessage({ type: 'SFP_IMPORT_CSV', ids });
+  const r = await sendMsg({ type: 'SFP_IMPORT_CSV', ids });
   toast(`导入 ${r.added} · 重复 ${r.duplicate} · 黑名单 ${r.skippedBlacklist || 0} · 已是好友 ${r.skippedFriend || 0}`, 'success');
   await refreshStatus();
 }
@@ -536,7 +536,7 @@ function csvEscape(v) {
 }
 
 async function exportCSV() {
-  const r = await chrome.runtime.sendMessage({ type: 'SFP_EXPORT_CSV' });
+  const r = await sendMsg({ type: 'SFP_EXPORT_CSV' });
   const lines = ['steam64,source,source_type,group,added_at,last_status,last_tried_at'];
   r.queue.forEach(item => {
     const id = typeof item === 'string' ? item : item.id;
@@ -555,7 +555,7 @@ async function exportCSV() {
 }
 
 async function exportBackup() {
-  const r = await chrome.runtime.sendMessage({ type: 'SFP_EXPORT_BACKUP' });
+  const r = await sendMsg({ type: 'SFP_EXPORT_BACKUP' });
   const json = JSON.stringify(r.data, null, 2);
   download(json, `sfp-backup-${todayStr()}.json`, 'application/json');
   toast('备份已导出', 'success');
@@ -575,7 +575,7 @@ async function importBackup() {
     catch (e) { toast('JSON 解析失败', 'error'); return; }
     if (!data.__sfp) { toast('不是有效的 SFP 备份文件', 'error'); return; }
     const merge = confirm('点「确定」= 合并到现有数据（推荐）\n点「取消」= 完全覆盖现有数据');
-    const r = await chrome.runtime.sendMessage({ type: 'SFP_IMPORT_BACKUP', data, merge });
+    const r = await sendMsg({ type: 'SFP_IMPORT_BACKUP', data, merge });
     toast(`已恢复：队列 ${r.queue} · 历史 ${r.tried} · 黑名单 ${r.blacklist} · 白名单 ${r.whitelist} · 好友对照 ${r.friends} · 设置 ${r.settings ? '是' : '否'}`, 'success', 4000);
     await refreshStatus();
   };
@@ -599,7 +599,7 @@ async function startBatch() {
   if (state.queue.length === 0) { toast('队列为空，先抓取或导入', 'warn'); return; }
   $('#btn-start').disabled = true; $('#btn-stop').disabled = false;
   state.running = true; renderBadges();
-  chrome.runtime.sendMessage({ type: 'SFP_START' }).catch(err => {
+  sendMsg({ type: 'SFP_START' }).catch(err => {
     toast('启动失败：' + (err.message || err), 'error');
     $('#btn-start').disabled = false; $('#btn-stop').disabled = true;
     state.running = false; renderBadges();
@@ -607,13 +607,13 @@ async function startBatch() {
 }
 
 async function stopBatch() {
-  await chrome.runtime.sendMessage({ type: 'SFP_STOP' });
+  await sendMsg({ type: 'SFP_STOP' });
   toast('已请求停止', 'warn');
 }
 
 async function batchRemove() {
   if (state.selected.size === 0) return;
-  await chrome.runtime.sendMessage({ type: 'SFP_REMOVE_FROM_QUEUE_BATCH', steamids: Array.from(state.selected) });
+  await sendMsg({ type: 'SFP_REMOVE_FROM_QUEUE_BATCH', steamids: Array.from(state.selected) });
   toast(`已移除 ${state.selected.size} 个`, 'success');
   state.selected.clear();
   await refreshStatus();
@@ -624,7 +624,7 @@ async function batchBlacklist() {
   const ids = Array.from(state.selected);
   let n = 0;
   for (const id of ids) {
-    const r = await chrome.runtime.sendMessage({ type: 'SFP_BLACKLIST_ADD', steamid: id, reason: 'queue-batch' });
+    const r = await sendMsg({ type: 'SFP_BLACKLIST_ADD', steamid: id, reason: 'queue-batch' });
     if (r && r.ok) n++;
   }
   toast(`已加入黑名单 ${n} 个`, 'success');
@@ -636,7 +636,7 @@ async function batchRetry() {
   if (state.selected.size === 0) return;
   const ids = Array.from(state.selected);
   // 清掉这些 ID 的历史记录，下一次调度器会把它们当新目标重新尝试
-  await chrome.runtime.sendMessage({ type: 'SFP_CLEAR_TRIED_OF', steamidList: ids });
+  await sendMsg({ type: 'SFP_CLEAR_TRIED_OF', steamidList: ids });
   toast(`已清历史 ${ids.length} 个，下次运行会重试`, 'success');
   state.selected.clear();
   await refreshStatus();
@@ -649,7 +649,7 @@ async function addToBlacklistFromInput() {
   if (ids.length === 0) { toast('没提取到 Steam ID', 'warn'); return; }
   let n = 0;
   for (const id of ids) {
-    const r = await chrome.runtime.sendMessage({ type: 'SFP_BLACKLIST_ADD', steamid: id, reason: 'manual' });
+    const r = await sendMsg({ type: 'SFP_BLACKLIST_ADD', steamid: id, reason: 'manual' });
     if (r && r.ok) n++;
   }
   toast(`已加黑名单 ${n} 个`, 'success');
@@ -662,7 +662,7 @@ async function addAllQueueToBlacklist() {
   if (!confirm(`确认把队列里 ${state.queue.length} 个全部加入黑名单？`)) return;
   for (const it of state.queue) {
     const id = typeof it === 'string' ? it : it.id;
-    await chrome.runtime.sendMessage({ type: 'SFP_BLACKLIST_ADD', steamid: id, reason: 'queue-all' });
+    await sendMsg({ type: 'SFP_BLACKLIST_ADD', steamid: id, reason: 'queue-all' });
   }
   toast(`已全部加入黑名单`, 'success');
   await refreshStatus();
@@ -675,7 +675,7 @@ async function addToWhitelistFromInput() {
   if (ids.length === 0) { toast('没提取到 Steam ID', 'warn'); return; }
   let n = 0;
   for (const id of ids) {
-    const r = await chrome.runtime.sendMessage({ type: 'SFP_WHITELIST_ADD', steamid: id, reason: 'manual' });
+    const r = await sendMsg({ type: 'SFP_WHITELIST_ADD', steamid: id, reason: 'manual' });
     if (r && r.ok) n++;
   }
   toast(`已加白名单 ${n} 个`, 'success');
@@ -704,7 +704,7 @@ function relTime(ms) {
 
 async function loadUpdateState() {
   try {
-    const r = await chrome.runtime.sendMessage({ type: 'SFP_UPDATE_STATE' });
+    const r = await sendMsg({ type: 'SFP_UPDATE_STATE' });
     if (r && r.state) renderUpdateBanner(r.state);
     if (r && r.currentVersion) {
       const badge = $('#version-badge');
@@ -756,7 +756,7 @@ async function manualCheckUpdate() {
   btn.disabled = true;
   btn.textContent = '⏳ 检查中…';
   try {
-    const r = await chrome.runtime.sendMessage({ type: 'SFP_CHECK_UPDATE' });
+    const r = await sendMsg({ type: 'SFP_CHECK_UPDATE' });
     if (r && r.error) {
       toast('检查失败：' + r.error, 'error', 4000);
     } else if (r && r.noRelease) {
@@ -810,7 +810,13 @@ chrome.runtime.onMessage.addListener((msg) => {
 
 // ==================== 初始化 ====================
 async function init() {
-  await refreshStatus();
+  // refreshStatus 抛错不能阻止后续事件绑定（否则「按钮无反应」）
+  try {
+    await refreshStatus();
+  } catch (e) {
+    console.error('[SFP] init refreshStatus failed:', e);
+    toast('初始加载失败：' + ((e && e.message) || e), 'error', 4000);
+  }
 
   // Tab
   $$('.tab-btn').forEach(b => b.onclick = () => switchTab(b.dataset.tab));
@@ -822,7 +828,7 @@ async function init() {
   $('#btn-clear-queue').onclick = async () => {
     if (state.queue.length === 0) return;
     if (!confirm(`确认清空 ${state.queue.length} 个队列项？`)) return;
-    await chrome.runtime.sendMessage({ type: 'SFP_CLEAR_QUEUE' });
+    await sendMsg({ type: 'SFP_CLEAR_QUEUE' });
     state.selected.clear();
     await refreshStatus();
   };
@@ -852,7 +858,7 @@ async function init() {
     const n = Object.keys(state.tried).length;
     if (n === 0) return;
     if (!confirm(`确认清空 ${n} 条历史？\n清空后这些 ID 会被视为新目标。`)) return;
-    await chrome.runtime.sendMessage({ type: 'SFP_CLEAR_TRIED' });
+    await sendMsg({ type: 'SFP_CLEAR_TRIED' });
     await refreshStatus();
   };
 
@@ -878,8 +884,8 @@ async function init() {
 
   // 自动更新
   $('#btn-check-update').onclick = manualCheckUpdate;
-  $('#btn-open-release').onclick = () => chrome.runtime.sendMessage({ type: 'SFP_OPEN_RELEASE' });
-  $('#btn-update-open').onclick = () => chrome.runtime.sendMessage({ type: 'SFP_OPEN_RELEASE' });
+  $('#btn-open-release').onclick = () => sendMsg({ type: 'SFP_OPEN_RELEASE' });
+  $('#btn-update-open').onclick = () => sendMsg({ type: 'SFP_OPEN_RELEASE' });
   $('#btn-update-dismiss').onclick = () => { $('#update-banner').classList.add('hidden'); };
   $('#version-badge').onclick = manualCheckUpdate;
 
