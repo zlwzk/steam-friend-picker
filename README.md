@@ -1,4 +1,4 @@
-# 🎮 Steam 好友收割机 (Steam Friend Picker) v1.3.1
+# 🎮 Steam 好友收割机 (Steam Friend Picker) v1.3.2
 
 Edge / Chrome 浏览器扩展（Manifest V3）。**多入口**抓取 Steam 好友代码 → 智能去重过滤 → **可配置间隔批量加好友**，自带风控保护（自适应间隔、日配额、时段、限流重试）和完整本地数据管理（黑/白名单、好友对照、JSON 备份），**内置自动检查更新**。
 
