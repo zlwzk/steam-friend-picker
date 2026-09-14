@@ -1,0 +1,77 @@
+{
+  "manifest_version": 3,
+  "name": "Steam 好友收割机",
+  "version": "0.2.0",
+  "description": "从小黑盒文章评论区、Steam 个人主页 / 群组成员 / 搜索结果批量抓取 Steam 好友代码，自动加好友。含黑名单、日配额、自适应间隔、JSON 全量备份。",
+  "permissions": [
+    "storage",
+    "cookies",
+    "tabs",
+    "scripting",
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://steamcommunity.com/*",
+    "https://store.steampowered.com/*",
+    "https://*.xiaoheihe.cn/*",
+    "https://api.xiaoheihe.cn/*"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Steam 好友收割机",
+    "default_icon": {
+      "16": "icons/16.png",
+      "48": "icons/48.png",
+      "128": "icons/128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.xiaoheihe.cn/article/*",
+        "https://www.xiaoheihe.cn/bbs/*",
+        "https://www.xiaoheihe.cn/discuss/*",
+        "https://www.xiaoheihe.cn/post/*"
+      ],
+      "js": ["content/common.js", "content/xiaoheihe.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://steamcommunity.com/id/*",
+        "https://steamcommunity.com/profiles/*"
+      ],
+      "js": ["content/common.js", "content/steam-profile.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://steamcommunity.com/groups/*/members*"
+      ],
+      "js": ["content/common.js", "content/steam-group.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://steamcommunity.com/search/users*"
+      ],
+      "js": ["content/common.js", "content/steam-search.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "icons": {
+    "16": "icons/16.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

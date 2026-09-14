@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>Steam 好友收割机</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body data-theme="dark">
+  <div class="app">
+    <header class="topbar">
+      <div class="title-row">
+        <h1>🎮 Steam 好友收割机</h1>
+        <span class="ver">v0.2.0</span>
+      </div>
+      <div class="status-bar">
+        <span id="login-status" class="badge badge-warn">检测中…</span>
+        <span id="running-status" class="badge badge-mute">空闲</span>
+        <span class="badge badge-info">队列 <b id="queue-count">0</b></span>
+        <span class="badge badge-info">历史 <b id="tried-count">0</b></span>
+        <span class="badge badge-info" id="today-quota-badge">今日 0/50</span>
+      </div>
+    </header>
+
+    <nav class="tab-bar" role="tablist">
+      <button class="tab-btn active" data-tab="queue">📋 队列</button>
+      <button class="tab-btn" data-tab="history">📜 历史</button>
+      <button class="tab-btn" data-tab="blacklist">🚫 黑名单</button>
+      <button class="tab-btn" data-tab="settings">⚙ 设置</button>
+      <button class="tab-btn" data-tab="backup">💾 备份</button>
+    </nav>
+
+    <main class="main-area">
+      <!-- ========== 队列 Tab ========== -->
+      <section class="tab-pane active" data-tab="queue">
+        <div class="action-row">
+          <button id="btn-scan-current" class="btn btn-secondary">📥 抓取当前页</button>
+          <button id="btn-import" class="btn btn-secondary">📂 导入</button>
+          <button id="btn-snapshot-friends" class="btn btn-secondary" title="把当前 Steam 账号的好友列表入库，用于入队前自动跳过">👥 抓好友对照</button>
+        </div>
+
+        <div class="filter-row">
+          <input type="text" id="queue-search" placeholder="🔍 搜索 ID 或来源…" class="search-input">
+          <select id="queue-group-filter" class="select-input">
+            <option value="">全部分组</option>
+          </select>
+          <label class="check-label"><input type="checkbox" id="queue-select-all"> 全选</label>
+          <span class="hint-inline" id="queue-selected-count">已选 0</span>
+        </div>
+
+        <div class="batch-row">
+          <button id="btn-batch-remove" class="btn btn-danger btn-small" disabled>🗑 删除选中</button>
+          <button id="btn-batch-blacklist" class="btn btn-danger btn-small" disabled>🚫 加入黑名单</button>
+          <button id="btn-batch-retry" class="btn btn-secondary btn-small" disabled>↻ 重试选中</button>
+          <button id="btn-clear-queue" class="btn btn-mute btn-small">清空全部</button>
+        </div>
+
+        <div id="queue-list" class="scroll-list queue-list">
+          <div class="empty">队列为空。<br>去小黑盒文章页 / Steam 主页 / 群组 / 搜索结果点悬浮按钮收割，或粘贴 ID 导入。</div>
+        </div>
+
+        <div class="footer-actions">
+          <button id="btn-start" class="btn btn-primary btn-large">▶ 开始批量添加</button>
+          <button id="btn-stop" class="btn btn-danger btn-large" disabled>■ 停止</button>
+        </div>
+      </section>
+
+      <!-- ========== 历史 Tab ========== -->
+      <section class="tab-pane" data-tab="history">
+        <div class="filter-row">
+          <select id="log-filter" class="select-input">
+            <option value="all">全部状态</option>
+            <option value="success">✓ 成功</option>
+            <option value="already">已是好友</option>
+            <option value="invited">邀请已发</option>
+            <option value="ratelimited">限流</option>
+            <option value="blocked">被屏蔽</option>
+            <option value="failed">失败</option>
+          </select>
+          <select id="log-group-filter" class="select-input">
+            <option value="">全部分组</option>
+          </select>
+          <input type="text" id="log-search" placeholder="🔍 搜 ID…" class="search-input">
+          <button id="btn-clear-history" class="btn btn-mute btn-small">清空历史</button>
+        </div>
+        <div id="log-list" class="scroll-list log-list">
+          <div class="empty">尚无记录</div>
+        </div>
+        <div class="stats-row" id="log-stats"></div>
+      </section>
+
+      <!-- ========== 黑名单 Tab ========== -->
+      <section class="tab-pane" data-tab="blacklist">
+        <div class="action-row">
+          <input type="text" id="blacklist-input" placeholder="粘贴 Steam ID（每行一个 / 链接 / BBCode）…" class="search-input" style="flex:1">
+          <button id="btn-blacklist-add" class="btn btn-danger">加入黑名单</button>
+          <button id="btn-blacklist-add-current" class="btn btn-secondary" title="把队列里全部 ID 加入黑名单">全部入黑</button>
+        </div>
+        <div class="hint">黑名单里的 ID 不会加入新队列，已在队列里的也会自动移除。被 Block 的人会自动加入（设置开关控制）。</div>
+
+        <h2 class="sub-title">黑名单 (<span id="blacklist-count">0</span>)</h2>
+        <div id="blacklist-list" class="scroll-list blacklist-list">
+          <div class="empty">空黑名单。</div>
+        </div>
+
+        <h2 class="sub-title">白名单 (<span id="whitelist-count">0</span>)</h2>
+        <div class="action-row">
+          <input type="text" id="whitelist-input" placeholder="粘贴 Steam ID…" class="search-input" style="flex:1">
+          <button id="btn-whitelist-add" class="btn btn-secondary">加入白名单</button>
+        </div>
+        <div class="hint">白名单永远不会被加入队列（即使外部抓到了）。</div>
+        <div id="whitelist-list" class="scroll-list whitelist-list">
+          <div class="empty">空白名单。</div>
+        </div>
+      </section>
+
+      <!-- ========== 设置 Tab ========== -->
+      <section class="tab-pane" data-tab="settings">
+        <h2 class="sub-title">调度</h2>
+        <div class="setting-grid">
+          <label>间隔</label>
+          <span><input type="number" id="interval-min" min="2" max="120" value="8"> ~
+            <input type="number" id="interval-max" min="2" max="180" value="15"> 秒</span>
+        </div>
+        <div class="setting-grid">
+          <label>单次最多</label>
+          <span><input type="number" id="max-per-run" min="1" max="200" value="30"> 人</span>
+        </div>
+        <div class="setting-grid">
+          <label>日配额</label>
+          <span><input type="number" id="daily-quota" min="0" max="500" value="50"> 人（0 = 不限）</span>
+        </div>
+        <div class="setting-grid">
+          <label>限流自动重试</label>
+          <label class="check-label"><input type="checkbox" id="retry-ratelimit" checked> 遇限流等 30s 重试，最多 <input type="number" id="max-retries" min="0" max="10" value="3" style="width:48px"> 次</label>
+        </div>
+        <div class="setting-grid">
+          <label>自适应间隔</label>
+          <label class="check-label"><input type="checkbox" id="adaptive-interval" checked> 限流命中自动 ×1.5 间隔</label>
+        </div>
+        <div class="setting-grid">
+          <label>黄金时段</label>
+          <label class="check-label">
+            <input type="checkbox" id="enable-time-window"> 只在
+            <input type="number" id="time-start" min="0" max="23" value="9" style="width:48px"> ~
+            <input type="number" id="time-end" min="1" max="24" value="23" style="width:48px"> 点运行
+          </label>
+        </div>
+        <div class="setting-grid">
+          <label>完成桌面通知</label>
+          <label class="check-label"><input type="checkbox" id="notify-complete" checked> 跑完一波弹通知</label>
+        </div>
+
+        <h2 class="sub-title">过滤</h2>
+        <div class="setting-grid">
+          <label>入队前跳过</label>
+          <label class="check-label"><input type="checkbox" id="skip-blacklist" checked> 黑名单</label>
+          <label class="check-label"><input type="checkbox" id="skip-friends" checked> 已知好友</label>
+        </div>
+        <div class="setting-grid">
+          <label>自动学习</label>
+          <label class="check-label"><input type="checkbox" id="auto-blacklist" checked> 被 Block 自动进黑名单</label>
+        </div>
+
+        <h2 class="sub-title">外观</h2>
+        <div class="setting-grid">
+          <label>主题</label>
+          <span>
+            <label class="check-label"><input type="radio" name="theme" value="dark" checked> 暗色</label>
+            <label class="check-label"><input type="radio" name="theme" value="light"> 浅色</label>
+          </span>
+        </div>
+      </section>
+
+      <!-- ========== 备份 Tab ========== -->
+      <section class="tab-pane" data-tab="backup">
+        <h2 class="sub-title">统计</h2>
+        <div class="stats-cards">
+          <div class="stat-card"><div class="stat-num" id="stat-total-success">0</div><div class="stat-label">总成功</div></div>
+          <div class="stat-card"><div class="stat-num" id="stat-total-failed">0</div><div class="stat-label">总失败</div></div>
+          <div class="stat-card"><div class="stat-num" id="stat-today">0</div><div class="stat-label">今日</div></div>
+          <div class="stat-card"><div class="stat-num" id="stat-quota-left">—</div><div class="stat-label">今日剩余</div></div>
+        </div>
+        <h2 class="sub-title">近 7 天加好友数</h2>
+        <canvas id="daily-chart" width="520" height="80"></canvas>
+
+        <h2 class="sub-title">导出 / 导入 / 好友对照</h2>
+        <div class="action-row">
+          <button id="btn-export-csv" class="btn btn-secondary">💾 导出 CSV</button>
+          <button id="btn-export-backup" class="btn btn-secondary">📦 导出 JSON 备份</button>
+        </div>
+        <div class="action-row">
+          <button id="btn-import-csv" class="btn btn-secondary">📂 导入 CSV</button>
+          <button id="btn-import-backup" class="btn btn-secondary">📥 恢复 JSON 备份</button>
+        </div>
+        <div class="hint">
+          CSV 仅含队列 + 历史，用于分享或 Excel。<br>
+          JSON 备份含全部数据（队列/历史/黑名单/白名单/好友对照/设置/每日计数）。<br>
+          所有数据仅存在本地，不会上传任何第三方。
+        </div>
+      </section>
+    </main>
+
+    <footer class="toast-area" id="toast-area"></footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

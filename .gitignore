@@ -1,0 +1,47 @@
+# ====== 编辑器 / 系统 ======
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ====== Node / 前端 ======
+node_modules/
+npm-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+
+# ====== Python ======
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+# ====== 用户数据 / 备份 / 日志（隐私红线：永远不要上传） ======
+# 避免意外提交任何含 Steam ID / 用户名 / Steam URL 的导出文件
+backups/
+*.export.json
+sfp-backup-*.json
+steam-friend-picker-*.csv
+*.log
+local-storage.json
+
+# ====== 本机构建/临时文件 ======
+dist/
+build/
+*.zip
+*.tar.gz
+*.exe
+*.spec
+
+# ====== 隐私占位符（防止误提交） ======
+# 任何含绝对路径 / Windows 用户名 / Steam 主页 URL 的文件
+.env
+.env.local
