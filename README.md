@@ -213,6 +213,8 @@ Edge / Chrome 浏览器扩展（Manifest V3）。**多入口**抓取 Steam 好�
 steam-friend-picker/
 ├── manifest.json                # MV3 配置
 ├── .gitignore                   # 隐私红线：阻止备份/日志/导出文件
+├── update.bat                   # 桌面一键更新器入口（双击即用）
+├── _auto_update.py              # 更新器本体（GUI + CLI，更新 Desktop 桌面副本）
 ├── background/
 │   └── service-worker.js        # Steam API 调用、调度、vanity 解析、好友快照
 ├── content/
@@ -296,14 +298,14 @@ A: 历史 Tab 选分组 → 看列表；如要全部清空，点「清空历史�
 **Q: 自动更新怎么用？**
 A: 三种方式任选：
 1. 弹窗顶栏版本号点击 / 设置 → 立即检查更新（半自动，会打开 GitHub release 页）
-2. 双击桌面根目录的 `update.bat`（一键全自动：拉新版 → 覆盖桌面副本 → Edge 扩展页 Reload）
+2. 双击**仓库根目录**的 `update.bat`（一键全自动：拉新版 → 覆盖 `Desktop\steam-friend-picker` 桌面副本 → 引导扩展页 Reload；无黑框可视化界面，`--force` 可强制重装修复损坏）
 3. 设置里把检查频率改短（如 1 小时），有更新就桌面通知
 
 **Q: 为什么 unpacked 加载不能完全自动更新？**
 A: 浏览器安全模型不允许扩展写本地任意路径的任意文件、也不允许 Service Worker 重启自身。所以即使扩展知道有新版本，也不能"自己替换自己的代码然后热重启"。`update.bat` 是当前最简方案——双击就完成覆盖。
 
-**Q: 桌面根没有 update.bat？**
-A: 我每次改项目都会自动把 `_auto_update.py` + `update.bat` 同步到桌面根目录（`%USERPROFILE%\Desktop\`）。如果你手工删了，自己从 `aa/_auto_update.py` 和 `aa/update.bat` 复制过去。
+**Q: update.bat 在哪？依赖什么？**
+A: 就在本仓库根目录（`update.bat` + `_auto_update.py` 一对，bat 用自身路径定位 py，放哪都能用）。要求本机装有 Python 3（tkinter 可用时弹可视化窗口，缺失自动退命令行模式）。它更新的是 `Desktop\steam-friend-picker` 桌面副本（浏览器「加载解压缩的扩展」加载的那份），不动仓库本身。
 
 **Q: 检查更新失败？**
 A: 看设置页底部 hint，会有具体错误。常见原因：网络/代理阻断 `api.github.com`、仓库设为私有、GitHub 限流（匿名 60 次/小时/IP）。
